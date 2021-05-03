@@ -1,0 +1,114 @@
+syntax = "proto3";
+package messagetypes;
+
+option go_package = "github.com/vitwit/cosmos-sdk-hbbft/abci";
+
+import "gogoproto/gogo.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+message ProofOp {
+    string type = 1;
+    bytes  key  = 2;
+    bytes  data = 3;
+}
+
+message ProofOps {
+    repeated ProofOp ops = 1 [(gogoproto.nullable) = false];
+}
+
+message ConsensusParams {
+  BlockParams     block     = 1;
+  EvidenceParams  evidence  = 2;
+  ValidatorParams validator = 3;
+  VersionParams   version   = 4;
+}
+
+message BlockParams {
+    int64 max_bytes = 1;
+    int64 max_gas   = 2;
+}
+
+message EvidenceParams {
+    int64                    max_age_num_blocks = 1;
+    google.protobuf.Duration max_age_duration   = 2
+        [(gogoproto.nullable) = false, (gogoproto.stdduration) = true];
+    int64                    max_bytes          = 3;
+}
+
+message ValidatorParams {
+    repeated string pub_key_types = 1;
+}
+
+message VersionParams {
+    uint64 app_version = 1;
+}
+
+message ValidatorUpdate {
+  PublicKey                   pub_key = 1 [(gogoproto.nullable) = false];
+  int64                       power   = 2;
+}
+
+message Header {} // TODO: Determine header contents
+
+message PublicKey {
+    option (gogoproto.compare) = true;
+    option (gogoproto.equal)   = true;
+
+    oneof sum {
+        bytes ed25519   = 1;
+        bytes secp256k1 = 2;
+        bytes sr25519   = 3;
+    }
+}
+
+message Event {
+    string                  type       = 1;
+    repeated EventAttribute attributes = 2 [
+    (gogoproto.nullable) = false,
+    (gogoproto.jsontag)  = "attributes,omitempty"
+    ];
+}
+
+message EventAttribute {
+    bytes key   = 1;
+    bytes value = 2;
+    bool  index = 3;
+}
+
+message LastCommitInfo {
+  int32             round = 1;
+  repeated VoteInfo votes = 2 [(gogoproto.nullable) = false];
+}
+
+message VoteInfo {
+  Validator validator         = 1 [(gogoproto.nullable) = false];
+  bool      signed_last_block = 2;
+}
+
+message Validator {
+    bytes address = 1;
+    int64 power   = 2;
+}
+
+enum EvidenceType {
+    UNKNOWN             = 0;
+    DUPLICATE_VOTE      = 1;
+    LIGHT_CLIENT_ATTACK = 2;
+}
+
+message Evidence {
+    EvidenceType              type               = 1;
+    Validator                 validator          = 2 [(gogoproto.nullable) = false];
+    int64                     height             = 3;
+    google.protobuf.Timestamp time               = 4 [(gogoproto.nullable) = false, (gogoproto.stdtime)  = true];
+    int64                     total_voting_power = 5;
+}
+
+message Snapshot {
+    uint64 height   = 1;  // The height at which the snapshot was taken
+    uint32 format   = 2;  // The application-specific snapshot format
+    uint32 chunks   = 3;  // Number of chunks in the snapshot
+    bytes  hash     = 4;  // Arbitrary snapshot hash, equal only if identical
+    bytes  metadata = 5;  // Arbitrary application metadata
+}

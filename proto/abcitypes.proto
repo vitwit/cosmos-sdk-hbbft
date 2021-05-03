@@ -1,0 +1,209 @@
+syntax = "proto3";
+
+option go_package = "github.com/vitwit/cosmos-sdk-hbbft/abci";
+
+import "gogoproto/gogo.proto";
+import "google/protobuf/timestamp.proto";
+import "message_types.proto";
+
+message RequestEcho {
+    string message = 1;
+}
+
+message ResponseEcho {
+    string message = 1;
+}
+
+message RequestFlush {}
+
+message ResponseFlush {}
+
+message RequestInfo {
+    string version = 1;
+    uint64 block_versino = 2;
+    uint64 p2p_version = 3;
+    string abci_version = 4;
+}
+
+message ResponseInfo {
+    string data = 1;
+    string version     = 2;
+    uint64 app_version = 3;
+    int64 last_block_height   = 4;
+    bytes last_block_app_hash = 5;
+}
+
+message RequestDeliverTx {
+    bytes tx = 1;
+}
+
+message ResponseDeliverTx {
+    uint32         code       = 1;
+    bytes          data       = 2;
+    string         log        = 3;  
+    string         info       = 4;  
+    int64          gas_wanted = 5 [json_name = "gas_wanted"];
+    int64          gas_used   = 6 [json_name = "gas_used"];
+    repeated messagetypes.Event events     = 7
+        [(gogoproto.nullable) = false, (gogoproto.jsontag) = "events,omitempty"];
+    string codespace = 8;
+}
+
+enum CheckTxType {
+  NEW     = 0 [(gogoproto.enumvalue_customname) = "New"];
+  RECHECK = 1 [(gogoproto.enumvalue_customname) = "Recheck"];
+}
+
+message RequestCheckTx {
+  bytes       tx   = 1;
+  CheckTxType type = 2;
+}
+
+message ResponseCheckTx {
+    uint32         code       = 1;
+    bytes          data       = 2;
+    string         log        = 3;
+    string         info       = 4;
+    int64          gas_wanted = 5 [json_name = "gas_wanted"];
+    int64          gas_used   = 6 [json_name = "gas_used"];
+    repeated messagetypes.Event events     = 7
+        [(gogoproto.nullable) = false, (gogoproto.jsontag) = "events,omitempty"];
+    string codespace = 8;
+}
+
+message RequestQuery {
+    bytes data = 1;
+    string path = 2;
+    int64 height = 3;
+    bool prove = 4;
+}
+
+message ResponseQuery {
+    uint32                     code      = 1;
+    string                     log       = 2;  
+    string                     info      = 3;  
+    int64                      index     = 4;
+    bytes                      key       = 5;
+    bytes                      value     = 6;
+    messagetypes.ProofOps      proof_ops = 7;
+    int64                      height    = 8;
+    string                     codespace = 9;
+}
+
+message RequestCommit {}
+
+message ResponseCommit {
+    bytes data          = 1;
+    int64 retain_height = 2;
+}
+
+message RequestInitChain {
+    google.protobuf.Timestamp             time = 1
+        [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
+    string                                chain_id         = 2;
+    messagetypes.ConsensusParams          consensus_params = 3;
+    repeated messagetypes.ValidatorUpdate validators       = 4 [(gogoproto.nullable) = false];
+    bytes                                 app_state_bytes  = 5;
+    int64                                 initial_height   = 6;
+}
+
+message ResponseInitChain {
+    messagetypes.ConsensusParams          consensus_params = 1;
+    repeated messagetypes.ValidatorUpdate validators       = 2 [(gogoproto.nullable) = false];
+    bytes                                 app_hash         = 3;
+}
+
+message RequestBeginBlock {
+    bytes                          hash                 = 1;
+    messagetypes.Header            header               = 2 [(gogoproto.nullable) = false];
+    messagetypes.LastCommitInfo    last_commit_info     = 3 [(gogoproto.nullable) = false];
+    repeated messagetypes.Evidence byzantine_validators = 4 [(gogoproto.nullable) = false];
+}
+
+message ResponseBeginBlock {
+    repeated messagetypes.Event events = 1
+      [(gogoproto.nullable) = false, (gogoproto.jsontag) = "events,omitempty"];
+}
+
+message RequestEndBlock {
+    int64 height = 1;
+}
+
+message ResponseEndBlock {
+    repeated messagetypes.ValidatorUpdate     validator_updates       = 1 [(gogoproto.nullable) = false];
+    messagetypes.ConsensusParams consensus_param_updates = 2;
+    repeated messagetypes.Event  events                  = 3
+        [(gogoproto.nullable) = false, (gogoproto.jsontag) = "events,omitempty"];
+}
+
+message RequestListSnapshots {}
+
+message ResponseListSnapshots {
+    repeated messagetypes.Snapshot snapshots = 1;
+}
+
+message RequestOfferSnapshot {
+    messagetypes.Snapshot snapshot = 1;  // snapshot offered by peers
+    bytes                 app_hash = 2;  // light client-verified app hash for snapshot height
+}
+
+message ResponseOfferSnapshot {
+    Result result = 1;
+
+    enum Result {
+        UNKNOWN       = 0;  // Unknown result, abort all snapshot restoration
+        ACCEPT        = 1;  // Snapshot accepted, apply chunks
+        ABORT         = 2;  // Abort all snapshot restoration
+        REJECT        = 3;  // Reject this specific snapshot, try others
+        REJECT_FORMAT = 4;  // Reject all snapshots of this format, try others
+        REJECT_SENDER = 5;  // Reject all snapshots from the sender(s), try others
+    }
+}
+
+message RequestLoadSnapshotChunk {
+    uint64 height = 1;
+    uint32 format = 2;
+    uint32 chunk  = 3;
+}
+
+message ResponseLoadSnapshotChunk {
+    bytes chunk = 1;
+}
+
+message RequestApplySnapshotChunk {
+    uint32 index  = 1;
+    bytes  chunk  = 2;
+    string sender = 3;
+}
+
+message ResponseApplySnapshotChunk {
+    Result          result         = 1;
+    repeated uint32 refetch_chunks = 2;  // Chunks to refetch and reapply
+    repeated string reject_senders = 3;  // Chunk senders to reject and ban
+
+    enum Result {
+        UNKNOWN         = 0;  // Unknown result, abort all snapshot restoration
+        ACCEPT          = 1;  // Chunk successfully accepted
+        ABORT           = 2;  // Abort all snapshot restoration
+        RETRY           = 3;  // Retry chunk (combine with refetch and reject)
+        RETRY_SNAPSHOT  = 4;  // Retry snapshot (combine with refetch and reject)
+        REJECT_SNAPSHOT = 5;  // Reject this snapshot, try others
+    }
+}
+
+service ABCIApplication {
+  rpc Echo(RequestEcho) returns (ResponseEcho);
+  rpc Flush(RequestFlush) returns (ResponseFlush);
+  rpc Info(RequestInfo) returns (ResponseInfo);
+  rpc DeliverTx(RequestDeliverTx) returns (ResponseDeliverTx);
+  rpc CheckTx(RequestCheckTx) returns (ResponseCheckTx);
+  rpc Query(RequestQuery) returns (ResponseQuery);
+  rpc Commit(RequestCommit) returns (ResponseCommit);
+  rpc InitChain(RequestInitChain) returns (ResponseInitChain);
+  rpc BeginBlock(RequestBeginBlock) returns (ResponseBeginBlock);
+  rpc EndBlock(RequestEndBlock) returns (ResponseEndBlock);
+  rpc ListSnapshots(RequestListSnapshots) returns (ResponseListSnapshots);
+  rpc OfferSnapshot(RequestOfferSnapshot) returns (ResponseOfferSnapshot);
+  rpc LoadSnapshotChunk(RequestLoadSnapshotChunk) returns (ResponseLoadSnapshotChunk);
+  rpc ApplySnapshotChunk(RequestApplySnapshotChunk) returns (ResponseApplySnapshotChunk);
+}
